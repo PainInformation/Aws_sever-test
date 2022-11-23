@@ -1,0 +1,68 @@
+version: '3'
+
+services:
+  djangoapp:
+    build: .
+        #command: python manage.py runserver 0:8000
+    #command: gunicorn project_name.wsgi:application --bind 0.0.0.0:8000
+    command: gunicorn handcoin.wsgi:application --bind 0:8000 
+    volumes:
+      - .:/opt/services/djangoapp/src
+      - ./static:/opt/services/djangoapp/static  # <-- bind the static volume
+      - media_volume:/opt/services/djangoapp/media  # <-- bind the media volume
+    networks:
+      - nginx_network
+    expose:
+      - "8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - 80:80
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./static:/opt/services/djangoapp/static  # <-- bind the static volume
+      - media_volume:/opt/services/djangoapp/media  # <-- bind the media volume
+    depends_on:
+      - djangoapp
+    networks:
+      - nginx_network
+
+  db:    
+    env_file: ../mariadb/.env
+    #build: ./mariadb
+    image: mariadb:10.9.2
+   
+    restart: always
+    
+    command: 
+      - --character-set-server=utf8mb4 
+      - --collation-server=utf8mb4_unicode_ci     
+    
+    ports:
+      - "3306:3306"
+
+    volumes:
+      - ../mariadb/volume:/var/lib/mysql
+      - ../mariadb/sql:/docker-entrypoint-initdb.d
+    environment:
+      TZ: 'Asia/Seoul'    
+      #MYSQL_DATABASE: mydb
+      #MYSQL_USER: root
+      #MYSQL_PASSWORD: 1234
+      #MYSQL_ROOT_PASSWORD: 1234
+      MARIADB_AUTO_UPGRADE: "1"
+      MARIADB_INITDB_SKIP_TZINFO: "1"
+
+volumes:
+  static_volume:  # <-- declare the static volume
+  media_volume:  # <-- declare the media volume
+
+networks:
+  nginx_network:
+    driver: bridge
+ 
